@@ -1,52 +1,65 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export default function InvitePage() {
-  const [code, setCode] = useState<string>('')
-  const [msg, setMsg] = useState<string>('')
+  const [code, setCode] = useState('')
+  const [status, setStatus] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  const createInvite = async () => {
-    setMsg('')
-    setCode('')
+  const submit = async () => {
+    setLoading(true)
+    setStatus(null)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setMsg('未ログインです')
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      setStatus('ログインしていません')
+      setLoading(false)
       return
     }
 
-    const { data, error } = await supabase
-      .from('invites')
-      .insert({
-        senior_id: user.id,
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      })
-      .select('code')
-      .single()
+    const { data, error } = await supabase.rpc('use_invite', {
+      invite_code: code,
+    })
 
     if (error) {
-      setMsg('作成に失敗: ' + error.message)
-      return
+      setStatus('エラー: ' + error.message)
+    } else {
+      setStatus('招待を受け取りました（紐付け完了）')
     }
 
-    setCode(data.code)
-    setMsg('招待コードを作成しました（7日間有効）')
+    setLoading(false)
   }
 
   return (
     <main style={{ padding: 24 }}>
-      <h1>招待コード発行（高齢者側）</h1>
-      <button onClick={createInvite}>招待コードを作る</button>
-      {msg && <p>{msg}</p>}
-      {code && (
-        <>
-          <p><b>招待コード</b></p>
-          <pre style={{ fontSize: 18 }}>{code}</pre>
-        </>
+      <h1>招待・紐付け</h1>
+
+      <p>家族から受け取った招待コードを入力してください</p>
+
+      <input
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        placeholder="招待コード"
+        style={{ padding: 8, width: 240 }}
+      />
+
+      <div style={{ marginTop: 12 }}>
+        <button onClick={submit} disabled={loading}>
+          {loading ? '処理中…' : '紐付けする'}
+        </button>
+      </div>
+
+      {status && (
+        <p style={{ marginTop: 16 }}>
+          {status}
+        </p>
       )}
-      <p>家族は /redeem に行ってこのコードを入力します。</p>
     </main>
   )
 }
