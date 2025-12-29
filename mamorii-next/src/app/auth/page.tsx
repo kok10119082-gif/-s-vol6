@@ -1,93 +1,72 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 export default function AuthPage() {
-  const supabase = createClient()
-  const router = useRouter()
-
-  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [message, setMessage] = useState<string>('')
+  const [msg, setMsg] = useState('')
+  const [err, setErr] = useState('')
 
   useEffect(() => {
-    // すでにログイン済みならダッシュボードへ
+    // すでにログイン済みならトップへ
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace('/dashboard')
+      if (data.session) location.href = '/'
     })
-  }, [router, supabase])
+  }, [])
 
-  const onSubmit = async () => {
-    setMessage('')
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMsg('')
+    setErr('')
+
     if (!email || !password) {
-      setMessage('メールとパスワードを入力してください')
+      setErr('email と password を入力してください')
       return
     }
 
-    if (mode === 'login') {
+    if (mode === 'signin') {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setMessage(`ログイン失敗: ${error.message}`)
-      else router.replace('/dashboard')
+      if (error) return setErr(error.message)
+      setMsg('ログイン成功。トップへ移動します...')
+      location.href = '/'
       return
     }
 
-    // signup
     const { error } = await supabase.auth.signUp({ email, password })
-    if (error) {
-      setMessage(`新規登録失敗: ${error.message}`)
-      return
-    }
-    setMessage('新規登録OK。メール確認が必要な設定の場合は、届いたメールから確認してください。')
-    router.replace('/dashboard')
-  }
-
-  const onLogout = async () => {
-    await supabase.auth.signOut()
-    router.replace('/auth')
+    if (error) return setErr(error.message)
+    setMsg('登録しました。メール確認が必要な設定の場合は確認してください。ログイン後トップへ戻ります。')
   }
 
   return (
-    <main style={{ maxWidth: 520, margin: '40px auto', padding: 16, fontFamily: 'system-ui' }}>
-      <h1>ログイン</h1>
+    <main style={{ padding: 24, fontFamily: 'system-ui', maxWidth: 520 }}>
+      <h1>{mode === 'signin' ? 'ログイン' : '新規登録'}</h1>
 
-      <div style={{ display: 'flex', gap: 8, margin: '16px 0' }}>
-        <button onClick={() => setMode('login')} disabled={mode === 'login'}>ログイン</button>
+      <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
+        <button onClick={() => setMode('signin')} disabled={mode === 'signin'}>ログイン</button>
         <button onClick={() => setMode('signup')} disabled={mode === 'signup'}>新規登録</button>
       </div>
 
-      <label style={{ display: 'block', marginTop: 12 }}>メール</label>
-      <input
-        style={{ width: '100%', padding: 10 }}
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="example@mail.com"
-        inputMode="email"
-        autoComplete="email"
-      />
+      <form onSubmit={submit} style={{ display: 'grid', gap: 10 }}>
+        <label>
+          メール
+          <input value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%' }} />
+        </label>
 
-      <label style={{ display: 'block', marginTop: 12 }}>パスワード</label>
-      <input
-        style={{ width: '100%', padding: 10 }}
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="8文字以上推奨"
-        type="password"
-        autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-      />
+        <label>
+          パスワード
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%' }} />
+        </label>
 
-      <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-        <button onClick={onSubmit}>{mode === 'login' ? 'ログイン' : '新規登録'}</button>
-        <button onClick={onLogout} type="button">ログアウト</button>
-      </div>
+        <button type="submit">{mode === 'signin' ? 'ログイン' : '登録'}</button>
+      </form>
 
-      {message && <p style={{ marginTop: 16, color: '#b00020' }}>{message}</p>}
+      {msg ? <p>{msg}</p> : null}
+      {err ? <pre style={{ whiteSpace: 'pre-wrap' }}>ERROR: {err}</pre> : null}
 
-      <p style={{ marginTop: 24 }}>
-        ログイン後は <a href="/dashboard">/dashboard</a> に入ります。
-      </p>
+      <p style={{ marginTop: 16 }}>ログイン後、自動でトップ（/）に戻ります。</p>
     </main>
   )
 }
