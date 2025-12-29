@@ -1,72 +1,59 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [msg, setMsg] = useState('')
-  const [err, setErr] = useState('')
+  const [msg, setMsg] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    // すでにログイン済みならトップへ
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) location.href = '/'
-    })
-  }, [])
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setMsg('')
-    setErr('')
-
-    if (!email || !password) {
-      setErr('email と password を入力してください')
-      return
-    }
-
-    if (mode === 'signin') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) return setErr(error.message)
-      setMsg('ログイン成功。トップへ移動します...')
-      location.href = '/'
-      return
-    }
-
+  const signUp = async () => {
+    setLoading(true); setMsg(null)
     const { error } = await supabase.auth.signUp({ email, password })
-    if (error) return setErr(error.message)
-    setMsg('登録しました。メール確認が必要な設定の場合は確認してください。ログイン後トップへ戻ります。')
+    setMsg(error ? `ERROR: ${error.message}` : 'OK: signUp（確認メールが必要な設定の場合はメールを確認）')
+    setLoading(false)
+  }
+
+  const signIn = async () => {
+    setLoading(true); setMsg(null)
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    setMsg(error ? `ERROR: ${error.message}` : 'OK: signIn')
+    setLoading(false)
+  }
+
+  const signOut = async () => {
+    setLoading(true); setMsg(null)
+    const { error } = await supabase.auth.signOut()
+    setMsg(error ? `ERROR: ${error.message}` : 'OK: signOut')
+    setLoading(false)
   }
 
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui', maxWidth: 520 }}>
-      <h1>{mode === 'signin' ? 'ログイン' : '新規登録'}</h1>
+    <main style={{ padding: 24 }}>
+      <h1>/auth（ログイン）</h1>
 
-      <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
-        <button onClick={() => setMode('signin')} disabled={mode === 'signin'}>ログイン</button>
-        <button onClick={() => setMode('signup')} disabled={mode === 'signup'}>新規登録</button>
-      </div>
-
-      <form onSubmit={submit} style={{ display: 'grid', gap: 10 }}>
+      <div style={{ display: 'grid', gap: 8, maxWidth: 360 }}>
         <label>
           メール
           <input value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%' }} />
         </label>
-
         <label>
           パスワード
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%' }} />
         </label>
 
-        <button type="submit">{mode === 'signin' ? 'ログイン' : '登録'}</button>
-      </form>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={signIn} disabled={loading}>ログイン</button>
+          <button onClick={signUp} disabled={loading}>新規登録</button>
+          <button onClick={signOut} disabled={loading}>ログアウト</button>
+        </div>
 
-      {msg ? <p>{msg}</p> : null}
-      {err ? <pre style={{ whiteSpace: 'pre-wrap' }}>ERROR: {err}</pre> : null}
+        {msg && <pre style={{ whiteSpace: 'pre-wrap' }}>{msg}</pre>}
 
-      <p style={{ marginTop: 16 }}>ログイン後、自動でトップ（/）に戻ります。</p>
+        <a href="/" style={{ marginTop: 12 }}>← トップへ戻る</a>
+      </div>
     </main>
   )
 }
